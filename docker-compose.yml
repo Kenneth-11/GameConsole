@@ -1,0 +1,57 @@
+name: gameconsole
+
+services:
+  gamestats-scala:
+    build:
+      context: ../GameStats/scala-service
+      dockerfile: Dockerfile
+    environment:
+      SCALA_SERVICE_PORT: "8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  gamestats-go:
+    build:
+      context: ../GameStats/go-service
+      dockerfile: Dockerfile
+    environment:
+      GO_SERVICE_PORT: "8080"
+      SCALA_SERVICE_URL: http://gamestats-scala:8081
+    depends_on:
+      gamestats-scala:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  prolog:
+    build:
+      context: ./prolog
+      dockerfile: Dockerfile
+    environment:
+      PROLOG_PORT: "8090"
+    ports:
+      - "127.0.0.1:${PROLOG_PORT:-8090}:8090"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "${WEB_PORT:-8088}:80"
+    depends_on:
+      gamestats-go:
+        condition: service_healthy
+      prolog:
+        condition: service_started
+    restart: unless-stopped
