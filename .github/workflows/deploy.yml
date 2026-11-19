@@ -18,7 +18,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    env:
+      GAMESTATS_REPOSITORY: https://github.com/Kenneth-11/gamestats.git
+      GAMESTATS_REF: feature/gameconsole-integration
     steps:
       - name: Desplegar en la VM por SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -26,11 +29,22 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: GAMESTATS_REPOSITORY,GAMESTATS_REF
           script_stop: true
           script: |
+            set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
             if [ "${{ inputs.skip_pull }}" != "true" ]; then
               git pull --ff-only
+              GAMESTATS_PATH="$(cd .. && pwd)/GameStats"
+              if [ -d "$GAMESTATS_PATH/.git" ]; then
+                git -C "$GAMESTATS_PATH" fetch --depth 1 origin "$GAMESTATS_REF"
+                git -C "$GAMESTATS_PATH" checkout --detach FETCH_HEAD
+              else
+                git clone --depth 1 --branch "$GAMESTATS_REF" \
+                  "$GAMESTATS_REPOSITORY" "$GAMESTATS_PATH"
+              fi
             fi
-            docker compose up -d --build
+            docker compose config --quiet
+            docker compose up -d --build --wait
             docker compose ps

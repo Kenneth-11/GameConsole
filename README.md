@@ -111,10 +111,10 @@ node scripts/smoke.mjs
 
 ## CI/CD
 
-- `.github/workflows/ci.yml`: tests y build del frontend, pruebas plunit y construcción de imágenes web/Prolog.
-- `.github/workflows/deploy.yml`: despliegue manual por SSH en la VM.
+- `.github/workflows/ci.yml`: tests y build del frontend, pruebas plunit y job `integration` que clona GameStats, construye las cuatro imágenes, levanta el stack y ejecuta el smoke test.
+- `.github/workflows/deploy.yml`: despliegue manual por SSH en la VM; actualiza GameConsole y el repo hermano `../GameStats` antes de reconstruir.
   Secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`.
-- `scripts/deploy.sh`: alternativa en la VM (`SKIP_GIT_PULL=1` para omitir `git pull`).
+- `scripts/deploy.sh`: alternativa en la VM (`SKIP_GIT_PULL=1` para omitir la actualización de ambos repos).
 
 Ver [docs/despliegue.md](docs/despliegue.md).
 

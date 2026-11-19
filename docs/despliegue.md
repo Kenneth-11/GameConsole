@@ -58,9 +58,19 @@ En una VM, abrir solo el puerto de `web` (por defecto 8088; se puede mapear `80:
 
 `.github/workflows/ci.yml` ejecuta en cada push/PR:
 
-1. `npm ci`, `npm test`, `npm run build` en `web/`.
+1. `npm ci`, `npm test` y `npm run build` en `web/`.
 2. Pruebas `plunit` de Prolog en `swipl:9.2.9`.
-3. Construcción de las imágenes `web` y `prolog`.
+3. Job `integration`: clona GameStats, valida `docker compose`, construye las cuatro imágenes, levanta el stack con healthchecks, ejecuta `scripts/smoke.mjs` y lo detiene.
+
+La rama integrada de GameStats está fijada en `ci.yml`:
+
+```yaml
+env:
+  GAMESTATS_REPOSITORY: https://github.com/Kenneth-11/gamestats.git
+  GAMESTATS_REF: feature/gameconsole-integration
+```
+
+Si esa rama se integra en `main`, actualizar `GAMESTATS_REF` para no depender de una rama temporal.
 
 ## CD
 
@@ -73,13 +83,31 @@ En una VM, abrir solo el puerto de `web` (por defecto 8088; se puede mapear `80:
 | `DEPLOY_SSH_KEY` | clave privada SSH |
 | `DEPLOY_PATH` | ruta al repo GameConsole en la VM |
 
-El job hace `git pull --ff-only` (opcional) y `docker compose up -d --build`.
+El job:
+
+1. Hace `git pull --ff-only` en GameConsole, salvo `skip_pull=true`.
+2. Actualiza el repo hermano `../GameStats` a `GAMESTATS_REF`, o lo clona si no existe.
+3. Valida el Compose, reconstruye y levanta el stack esperando healthchecks.
+
+La VM debe tener los repositorios hermanos:
+
+```
+DEPLOY_PATH/
+  GameConsole/
+  GameStats/
+```
 
 Alternativa local en la VM:
 
 ```bash
 ./scripts/deploy.sh
 SKIP_GIT_PULL=1 ./scripts/deploy.sh
+```
+
+`GAMESTATS_REF` se puede cambiar sin editar el script:
+
+```bash
+GAMESTATS_REF=main ./scripts/deploy.sh
 ```
 
 ## Diagnóstico
