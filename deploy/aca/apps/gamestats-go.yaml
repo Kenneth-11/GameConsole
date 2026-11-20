@@ -1,0 +1,60 @@
+location: francecentral
+name: gamestats-go
+properties:
+  environmentId: __ENVIRONMENT_ID__
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 8080
+      transport: http
+      traffic:
+        - latestRevision: true
+          weight: 100
+    registries:
+      - server: ghcr.io
+        username: __GHCR_USERNAME__
+        passwordSecretRef: ghcr-pat
+    secrets:
+      - name: ghcr-pat
+        value: __GHCR_PAT__
+  template:
+    containers:
+      - name: gamestats-go
+        image: __IMAGE__
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: GO_SERVICE_PORT
+            value: "8080"
+          - name: SCALA_SERVICE_URL
+            value: http://gamestats-scala
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          - type: Liveness
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: Readiness
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+    scale:
+      minReplicas: 1
+      maxReplicas: 1

@@ -1,0 +1,58 @@
+location: francecentral
+name: gamestats-scala
+properties:
+  environmentId: __ENVIRONMENT_ID__
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: false
+      targetPort: 8081
+      transport: http
+      traffic:
+        - latestRevision: true
+          weight: 100
+    registries:
+      - server: ghcr.io
+        username: __GHCR_USERNAME__
+        passwordSecretRef: ghcr-pat
+    secrets:
+      - name: ghcr-pat
+        value: __GHCR_PAT__
+  template:
+    containers:
+      - name: gamestats-scala
+        image: __IMAGE__
+        resources:
+          cpu: 0.5
+          memory: 1.0Gi
+        env:
+          - name: SCALA_SERVICE_PORT
+            value: "8081"
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          - type: Liveness
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: Readiness
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+    scale:
+      minReplicas: 1
+      maxReplicas: 1

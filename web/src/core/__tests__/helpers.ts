@@ -14,6 +14,7 @@ export function fakeStorage(): StorageLike {
     removeItem: (key) => {
       data.delete(key)
     },
+    keys: () => [...data.keys()],
   }
 }
 

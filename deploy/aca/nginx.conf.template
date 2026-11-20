@@ -1,0 +1,47 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /api/ {
+        proxy_pass https://${GAMESTATS_GO_HOST}/;
+        proxy_http_version 1.1;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 2;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_ssl_name ${GAMESTATS_GO_TLS_NAME};
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${GAMESTATS_GO_HOST};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 15s;
+    }
+
+    location /prolog/ {
+        proxy_pass https://${GAMECONSOLE_PROLOG_HOST}/;
+        proxy_http_version 1.1;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 2;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_ssl_name ${GAMECONSOLE_PROLOG_TLS_NAME};
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${GAMECONSOLE_PROLOG_HOST};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 20s;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

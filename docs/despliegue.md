@@ -11,28 +11,65 @@
     GameConsole/
   ```
 
-El compose de GameConsole construye GameStats desde `../GameStats/scala-service` y `../GameStats/go-service`.
+GameStats debe estar en la rama `feature/gameconsole-integration` mientras no se integre en `main`. El compose de GameConsole construye GameStats desde `../GameStats/scala-service` y `../GameStats/go-service`.
+
+## GameStats y separación de repositorios
+
+GameStats es un repositorio independiente y no se copia dentro de GameConsole. GameConsole no modifica su código.
+
+- El stack local construye las imágenes de Go y Scala desde `../GameStats`; hoy no se publican en un registry.
+- CI y CD fijan la rama con `GAMESTATS_REF=feature/gameconsole-integration`; si esa rama se integra en `main`, hay que actualizar la referencia.
+- El estado de las partidas vive en memoria del servicio Go. Reiniciar el proceso pierde partidas y análisis; no hay persistencia externa.
+- Cualquier despliegue con réplicas o reinicios frecuentes debe resolver esa limitación antes de considerarse equivalente al stack local. No está implementado.
 
 ## Local / VM
 
 ```bash
 cd GameConsole
 cp .env.example .env       # opcional: WEB_PORT, PROLOG_PORT
-docker compose up -d --build
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Windows PowerShell:
+
+```powershell
+Set-Location "C:\ruta\a\Lenguajes-Programacion\GameConsole"
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+docker compose down --remove-orphans
+docker compose up -d --build --wait
 docker compose ps
 ```
 
 - Consola: `http://localhost:8088` (o `WEB_PORT`).
-- GameStats y Prolog quedan en la red interna de Compose.
-- Prolog se expone en `127.0.0.1:8090` para depuración y para el modo desarrollo con Vite.
+- GameStats y Prolog quedan en la red interna de Compose; Prolog además se publica en `127.0.0.1:8090` para depuración y para el modo desarrollo con Vite.
 
 Verificación:
 
-```bash
+```powershell
+$web = Invoke-WebRequest -Uri "http://localhost:8088/healthz" -UseBasicParsing
+$api = Invoke-RestMethod -Uri "http://localhost:8088/api/health"
+$prolog = Invoke-RestMethod -Uri "http://localhost:8088/prolog/health"
+[pscustomobject]@{ Web = $web.StatusCode; GameStats = $api.status; Prolog = $prolog.status } | Format-List
+
 node scripts/smoke.mjs
 ```
 
 El script comprueba salud de GameStats y Prolog, envía un partido de Conecta 4 completo por el proxy, espera el análisis y valida `byGame.connect4`.
+
+Pruebas del proyecto:
+
+```powershell
+Set-Location web
+npm ci
+npm test
+npm run lint
+npm run build
+
+Set-Location ..
+docker run --rm -v "${PWD}\prolog:/app" -w /app swipl:9.2.9 `
+  swipl -q -g run_tests -t halt tests.pl
+```
 
 ## Actualizar
 
@@ -70,9 +107,9 @@ env:
   GAMESTATS_REF: feature/gameconsole-integration
 ```
 
-Si esa rama se integra en `main`, actualizar `GAMESTATS_REF` para no depender de una rama temporal.
+Si esa rama se integra en `main`, actualizar `GAMESTATS_REF` para no depender de una rama de integración.
 
-## CD
+## CD actual (VM por SSH)
 
 `.github/workflows/deploy.yml` se lanza manualmente (`workflow_dispatch`). Secretos requeridos:
 
@@ -109,6 +146,26 @@ SKIP_GIT_PULL=1 ./scripts/deploy.sh
 ```bash
 GAMESTATS_REF=main ./scripts/deploy.sh
 ```
+
+## Azure Container Apps (despliegue preview)
+
+Estado: **desplegado y verificado**. URL pública de GameConsole:
+`https://gameconsole-web.kindgrass-c6ff1ed0.francecentral.azurecontainerapps.io`
+
+Entorno definido por el equipo:
+
+- Suscripción `Azure for Students`, resource group existente `gameconsole-rg`, región `francecentral`.
+- Un Container Apps Environment `gameconsole-aca-env` y un workspace de Log Analytics `gameconsole-logs` (30 días de retención). No se crearon VM ni ACR.
+- Cuatro Container Apps con imágenes publicadas en `ghcr.io/kenneth-11` con tag `aca-preview-1`. La imagen web quedó fijada por digest para forzar el pull de la corrección de HTTPS.
+- Recursos por app: `gamestats-scala` 0.5 vCPU/1.0Gi (1/1), `gamestats-go` 0.25/0.5Gi (1/1), `gameconsole-prolog` 0.25/0.5Gi (0/3) y `gameconsole-web` 0.25/0.5Gi (1/3). Sin aumentos respecto al diseño aprobado.
+- Ingress: inicialmente `web` external y los tres backends internal. El environment Express no resuelve nombres cortos y el certificado del ingress interno no permite validación de hostname, por lo que los tres backends se cambiaron a `external` de forma temporal, con HTTPS + SNI + validación de certificados y reglas de IP que solo permiten el egress de `gameconsole-web` y `gamestats-go`. Ver [deploy/aca/README.md](../deploy/aca/README.md#13-exposicion-temporal-de-backends-evaluacion-en-azure) para el cierre de esa exposición.
+
+Scripting y verificación:
+
+- `deploy/aca/*.ps1`: construcción de imágenes, publicación en GHCR, preflight, deploy, smoke, verificación de reproducibilidad y rollback. Los secretos se leen de `GHCR_USERNAME`/`GHCR_PAT` y se redactan en la salida; no hay credenciales en el repositorio.
+- Pruebas ejecutadas contra la URL pública: `/healthz`, `/api/health` y `/prolog/health` → 200; tres pruebas `live.test.ts` (racing, combat, connect4) → PASS; `scripts/smoke.mjs` → PASS con decisión real de Prolog, análisis de GameStats y actualización de `byGame.connect4`.
+
+Limitación: `gamestats-go` mantiene las partidas en memoria; un reinicio o redeploy pierde el estado, igual que en el stack local. El despliegue es una versión funcional de evaluación, no una configuración de producción con persistencia.
 
 ## Diagnóstico
 

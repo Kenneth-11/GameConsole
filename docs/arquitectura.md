@@ -41,7 +41,7 @@ BaseGame ─────> MatchRegistry ───> localStorage
 ## Concurrencia
 
 - Cada partida tiene su propia instancia, `matchId` y `EventQueue`; no comparten cola.
-- Varias pestañas pueden jugar a la vez. El registro usa `localStorage` y se refresca con el evento `storage` y al recuperar el foco.
+- Varias pestañas pueden jugar a la vez. El registro usa `localStorage` con una clave por partida y se fusiona con `gameconsole.matches.v1`; el panel lo relee en cada polling. El lobby muestra solo las sesiones de la pestaña actual.
 - El servidor GameStats rutea por `matchId`, por lo que el orden solo debe garantizarse dentro de cada partida.
 
 ## Manejo de fallos

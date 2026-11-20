@@ -18,9 +18,22 @@ Navegador
 
 GameStats conserva su propia arquitectura Go + Scala y puede ejecutarse por separado. El `docker-compose.yml` de GameConsole construye el stack integrado usando los Dockerfiles de `../GameStats`.
 
+## Documentación
+
+- [Arquitectura](docs/arquitectura.md)
+- [Contrato de eventos](docs/contrato-eventos.md)
+- [Despliegue y operación](docs/despliegue.md)
+- [Guion de la demostración](docs/guion-video.md)
+
 ## Inicio rápido (stack integrado)
 
-Requisitos: Docker Desktop / Docker Engine con Compose, y los repositorios como hermanos:
+### Requisitos previos
+
+- Docker Desktop o Docker Engine 24+ con Compose v2.
+- Los repositorios `GameConsole` y `GameStats` como hermanos en disco.
+- `GameStats` en la rama `feature/gameconsole-integration` mientras no se integre en `main`; el Compose construye el checkout local.
+- Node.js 22+ solo para ejecutar pruebas o el smoke test desde el host; el stack integrado no lo requiere.
+- Puertos `8088` y `8090` libres, o valores distintos en `.env`.
 
 ```
 Lenguajes-Programacion/
@@ -30,17 +43,40 @@ Lenguajes-Programacion/
 
 ```bash
 cd GameConsole
-cp .env.example .env
-docker compose up -d --build
+cp .env.example .env   # opcional: WEB_PORT y PROLOG_PORT
+docker compose up -d --build --wait
+docker compose ps
 ```
 
 Abrir <http://localhost:8088>. El puerto se puede cambiar con `WEB_PORT`.
 
+### Windows PowerShell
+
+```powershell
+Set-Location "C:\ruta\a\Lenguajes-Programacion\GameConsole"
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+docker compose down --remove-orphans
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Comprobar salud y abrir la consola:
+
+```powershell
+$web = Invoke-WebRequest -Uri "http://localhost:8088/healthz" -UseBasicParsing
+$api = Invoke-RestMethod -Uri "http://localhost:8088/api/health"
+$prolog = Invoke-RestMethod -Uri "http://localhost:8088/prolog/health"
+[pscustomobject]@{ Web = $web.StatusCode; GameStats = $api.status; Prolog = $prolog.status } | Format-List
+Start-Process "http://localhost:8088"
+```
+
 Verificación automática por HTTP (eventos, Prolog, análisis y `/stats`):
 
-```bash
+```powershell
 node scripts/smoke.mjs
 ```
+
+Para detener el stack: `docker compose down`.
 
 ## Modo desarrollo
 
@@ -83,7 +119,7 @@ Cada partida usa `matchId = gc-<gameId>-<uuid>` y `eventId` único. La cola FIFO
 - `GET /api/stats` → totales y `byGame` (partidas, finalizadas, activas, analizadas, eventos, jugadores).
 - `GET /api/matches/{id}/analysis` → `patterns` y `statistics` calculados por GameStats.
 - Polling cada 3 s; la consola no recalcula nada.
-- Las partidas se registran en `localStorage` (`gameconsole.matches.v1`), visible entre pestañas.
+- El registro usa una clave de `localStorage` por partida y se fusiona con `gameconsole.matches.v1`; el panel lo relee cada 3 s. El lobby muestra solo las sesiones de la pestaña actual.
 
 ## Endpoints internos
 
@@ -95,19 +131,26 @@ Cada partida usa `matchId = gc-<gameId>-<uuid>` y `eventId` único. La cola FIFO
 
 ## Pruebas
 
-```bash
+```powershell
 # Frontend
-cd web
+Set-Location web
+npm ci
 npm test
+npm run lint
 npm run build
 
 # Prolog
-docker run --rm -v "$PWD/prolog:/app" -w /app swipl:9.2.9 \
+Set-Location ..
+docker run --rm -v "${PWD}\prolog:/app" -w /app swipl:9.2.9 `
   swipl -q -g run_tests -t halt tests.pl
 
 # Integración (stack arriba)
 node scripts/smoke.mjs
 ```
+
+`npm test` ejecuta las pruebas unitarias y de integración del frontend; la prueba
+`live` se omite si el stack no está levantado. El smoke test requiere el stack
+arriba y Node.js 22+.
 
 ## CI/CD
 
@@ -115,6 +158,7 @@ node scripts/smoke.mjs
 - `.github/workflows/deploy.yml`: despliegue manual por SSH en la VM; actualiza GameConsole y el repo hermano `../GameStats` antes de reconstruir.
   Secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`.
 - `scripts/deploy.sh`: alternativa en la VM (`SKIP_GIT_PULL=1` para omitir la actualización de ambos repos).
+- Azure Container Apps: despliegue preview ejecutado y verificado. URL pública: `https://gameconsole-web.kindgrass-c6ff1ed0.francecentral.azurecontainerapps.io`. Recursos, configuración definitiva, pruebas y cierre de la exposición temporal de backends: [deploy/aca/README.md](deploy/aca/README.md).
 
 Ver [docs/despliegue.md](docs/despliegue.md).
 
@@ -130,7 +174,7 @@ GameConsole/
     src/ui/               # React: lobby, tablero, log, panel
     src/core/__tests__/   # Vitest
   scripts/                # smoke.mjs, deploy.sh
-  docs/                   # arquitectura, contrato de eventos, despliegue
+  docs/                   # arquitectura, contrato de eventos, despliegue y guion
   .github/workflows/      # CI y deploy
 ```
 
@@ -140,4 +184,5 @@ GameConsole/
 - El `202` de GameStats confirma recepción, no aceptación lógica. Por eso el `MATCH_STARTED` se espera antes de continuar.
 - GameStats guarda partidas en memoria: al reiniciar el servicio Go, `/analysis` de partidas viejas deja de existir y el panel lo muestra como no disponible.
 - `connect4` recibe el análisis genérico de GameStats (`eventsCount`, `playersCount`, `note`), porque Scala no tiene analizador específico para ese juego.
+- El registro de partidas usa una clave de `localStorage` por partida y se fusiona con `gameconsole.matches.v1`; así dos pestañas no se sobrescriben al crear partidas a la vez. El Lobby sigue mostrando solo las sesiones de la pestaña actual.
 - La IA usa profundidad configurable (3–6, por defecto 4). Más profundidad aumenta el tiempo de respuesta; el cliente corta a los 15 s y permite reintentar.

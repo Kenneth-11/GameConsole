@@ -1,0 +1,56 @@
+location: francecentral
+name: gameconsole-web
+properties:
+  environmentId: __ENVIRONMENT_ID__
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 80
+      transport: http
+      traffic:
+        - latestRevision: true
+          weight: 100
+    registries:
+      - server: ghcr.io
+        username: __GHCR_USERNAME__
+        passwordSecretRef: ghcr-pat
+    secrets:
+      - name: ghcr-pat
+        value: __GHCR_PAT__
+  template:
+    containers:
+      - name: gameconsole-web
+        image: __IMAGE__
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env: []
+        probes:
+          - type: Startup
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          - type: Liveness
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          - type: Readiness
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
