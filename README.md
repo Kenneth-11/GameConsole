@@ -23,7 +23,6 @@ GameStats conserva su propia arquitectura Go + Scala y puede ejecutarse por sepa
 - [Arquitectura](docs/arquitectura.md)
 - [Contrato de eventos](docs/contrato-eventos.md)
 - [Despliegue y operación](docs/despliegue.md)
-- [Guion de la demostración](docs/guion-video.md)
 - [Video demostrativo](https://youtu.be/e4ABOJuHwFk)
 
 ## Inicio rápido (stack integrado)
@@ -175,7 +174,7 @@ GameConsole/
     src/ui/               # React: lobby, tablero, log, panel
     src/core/__tests__/   # Vitest
   scripts/                # smoke.mjs, deploy.sh
-  docs/                   # arquitectura, contrato de eventos, despliegue y guion
+  docs/                   # arquitectura, contrato de eventos y despliegue
   .github/workflows/      # CI y deploy
 ```
 
