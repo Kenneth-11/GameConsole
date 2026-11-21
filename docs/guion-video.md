@@ -3,7 +3,7 @@
 - Duración objetivo: 12–14 minutos; máximo 15.
 - Modalidad: ejecución local con Docker Compose.
 - Requisito: el stack debe estar limpio y funcionando antes de grabar.
-- Enlace público: pendiente de publicar.
+- Enlace público: https://youtu.be/e4ABOJuHwFk
 
 ## Preparación
 
@@ -108,4 +108,4 @@ Cerrar con:
 - [ ] Se explica que GameConsole no calcula estadísticas.
 - [ ] Se muestra Docker y el arranque local.
 - [ ] La duración no supera 15 minutos.
-- [ ] El video se publica y el enlace se agrega al README.
+- [x] El video se publica y el enlace se agrega al README.

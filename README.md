@@ -24,6 +24,7 @@ GameStats conserva su propia arquitectura Go + Scala y puede ejecutarse por sepa
 - [Contrato de eventos](docs/contrato-eventos.md)
 - [Despliegue y operación](docs/despliegue.md)
 - [Guion de la demostración](docs/guion-video.md)
+- [Video demostrativo](https://youtu.be/e4ABOJuHwFk)
 
 ## Inicio rápido (stack integrado)
 
